@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>Edit Procurement Event</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+        }
+
+        h1 {
+            text-align: center;
+        }
+
+        form {
+            max-width: 600px;
+            margin: 0 auto;
+        }
+
+        label {
+            display: block;
+            margin: 10px 0 5px;
+            font-weight: bold;
+        }
+
+        input, button {
+            width: 100%;
+            padding: 10px;
+            margin-bottom: 15px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+        }
+
+        button {
+            background-color: #007BFF;
+            color: white;
+            font-weight: bold;
+            border: none;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background-color: #0056b3;
+        }
+    </style>
+</head>
+<body>
+    <h1>Edit Procurement Event</h1>
+    <h2>Selected Suppliers</h2>
+    <ul>
+        {% for supplier in selected_suppliers %}
+        <li>{{ supplier }}</li>
+        {% endfor %}
+    </ul>
+    <form id="editEventForm">
+        <label>Quantity</label>
+        <input type="number" id="quantity" value="{{ quantity }}" readonly>
+
+        <label>Commodity</label>
+        <input type="text" id="commodity" value="{{ commodity }}" readonly>
+
+        <label>Budget</label>
+        <input type="number" id="budget" value="{{ budget }}" readonly>
+
+        <label>Payment Terms</label>
+        <input type="text" id="payment_terms" required>
+
+        <label>Delivery Deadline</label>
+        <input type="date" id="delivery_deadline" required>
+
+        <button type="button" onclick="submitEditedEvent()">Publish Event</button>
+    </form>
+
+    <script>
+		function submitEditedEvent() {
+			const data = {
+				payment_terms: document.getElementById("payment_terms").value,
+				delivery_deadline: document.getElementById("delivery_deadline").value
+			};
+
+			fetch('/publish_event', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify(data)
+			})
+			.then(response => response.json())
+			.then(data => {
+				if (data.message) {
+					alert(data.message);
+					window.location.href = "/analyze_quotes"; // Redirect to Analyze Quotes page
+				} else if (data.error) {
+					alert(data.error);
+				}
+			})
+			.catch(error => console.error("Error submitting event:", error));
+		}
+	</script>
+
+</body>
+</html>

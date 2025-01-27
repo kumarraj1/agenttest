@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Create Procurement Event</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f9f9f9;
+            margin: 0;
+            padding: 20px;
+        }
+
+        h1 {
+            color: #333;
+            text-align: center;
+        }
+
+        form {
+            background-color: #fff;
+            padding: 20px;
+            margin: 0 auto;
+            width: 50%;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+            border-radius: 8px;
+        }
+
+        label {
+            display: block;
+            margin-top: 10px;
+            font-weight: bold;
+        }
+
+        input, select, button {
+            width: 100%;
+            padding: 10px;
+            margin-top: 5px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+
+        button {
+            background-color: #007BFF;
+            color: white;
+            font-weight: bold;
+            border: none;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background-color: #0056b3;
+        }
+
+        #recommendations {
+            margin-top: 20px;
+            background-color: #fff;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+        }
+
+        .supplier-recommendation {
+            border-bottom: 1px solid #ccc;
+            padding: 10px 0;
+        }
+
+        .supplier-recommendation:last-child {
+            border-bottom: none;
+        }
+
+        .edit-publish-btn {
+            display: inline-block;
+            background-color: #28a745;
+            color: white;
+            font-weight: bold;
+            padding: 10px 20px;
+            text-align: center;
+            text-decoration: none;
+            border-radius: 4px;
+            margin-top: 20px;
+        }
+
+        .edit-publish-btn:hover {
+            background-color: #218838;
+        }
+    </style>
+    <script>
+        function submitEvent() {
+            const buyerInput = {
+                base_language: document.getElementById("base_language").value,
+                regions: document.getElementById("regions").value,
+                departments: document.getElementById("departments").value,
+                currency: document.getElementById("currency").value,
+                commodity: document.getElementById("commodity").value,
+                contract_months: document.getElementById("contract_months").value,
+                contract_effective_date: document.getElementById("contract_effective_date").value,
+                quantity: document.getElementById("quantity").value,
+                budget: document.getElementById("budget").value
+            };
+
+            fetch('/get_suppliers', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(buyerInput)
+            })
+            .then(response => response.json())
+            .then(data => displayRecommendations(data))
+            .catch(error => alert("Error fetching suppliers: " + error));
+        }
+
+		function displayRecommendations(data) {
+			const container = document.getElementById("recommendations");
+			container.innerHTML = "<h2>Supplier Recommendations</h2>";
+			if (data.error) {
+				container.innerHTML += `<p>Error: ${data.error}</p>`;
+				return;
+			}
+
+			const suppliers = data.ranked_suppliers || [];
+			const insights = data.ai_insights || {};
+
+			suppliers.forEach((supplier, index) => {
+				const trends = (supplier.ai_insights && supplier.ai_insights.trends) || [];
+				const optimizations = (supplier.ai_insights && supplier.ai_insights.optimizations) || [];
+
+				container.innerHTML += `
+					<div>
+						<input type="checkbox" class="supplier-checkbox" value="${supplier.supplier_name}">
+						<strong>${index + 1}. ${supplier.supplier_name}</strong> (Score: ${supplier.score})<br>
+						Reason: ${supplier.ranking_reason}<br>
+						Match: ${supplier.match_percentage}%<br>
+						Region: ${supplier.region}<br>
+						Risks: ${supplier.risks.join(", ")}<br>
+						<strong>AI Insights:</strong>
+						<ul>
+							<li>Trends: ${trends.join(", ") || "No trends available"}</li>
+							<li>Optimizations: ${optimizations.join(", ") || "No optimizations available"}</li>
+						</ul>
+					</div>
+				`;
+			});
+
+			container.innerHTML += `
+				<h3>Global AI Insights</h3>
+				<p><strong>Trends:</strong> ${insights.trends?.join(", ") || "No trends available"}</p>
+				<p><strong>Risks:</strong> ${insights.risks?.join(", ") || "No risks available"}</p>
+				<p><strong>Optimizations:</strong> ${insights.optimizations?.join(", ") || "No optimizations available"}</p>
+				<button onclick="proceedToEdit()">Edit and Publish</button>
+			`;
+		}
+
+
+        function proceedToEdit() {
+			const selectedSuppliers = [];
+			document.querySelectorAll(".supplier-checkbox:checked").forEach(checkbox => {
+				selectedSuppliers.push(checkbox.value);
+			});
+
+			if (selectedSuppliers.length === 0) {
+				alert("Please select at least one supplier.");
+				return;
+			}
+
+			const data = {
+				selected_suppliers: selectedSuppliers,
+				quantity: document.getElementById("quantity").value,
+				commodity: document.getElementById("commodity").value,
+				budget: document.getElementById("budget").value,
+			};
+
+			fetch('/edit_event', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify(data)
+			})
+			.then(response => response.json())
+			.then(data => {
+				if (data.message) {
+					window.location.href = "/edit_event"; // Redirect to edit event page
+				}
+			})
+			.catch(error => alert("Error proceeding to edit page: " + error));
+		}
+
+    </script>
+</head>
+<body>
+    <h1>Create Procurement Event</h1>
+    <form>
+        <label>Base Language:</label>
+        <input type="text" id="base_language" required><br>
+        <label>Regions:</label>
+        <input type="text" id="regions" required><br>
+        <label>Departments:</label>
+        <input type="text" id="departments" required><br>
+        <label>Currency:</label>
+        <input type="text" id="currency" required><br>
+        <label>Commodity:</label>
+        <input type="text" id="commodity" required><br>
+        <label>Contract Months:</label>
+        <input type="number" id="contract_months" required><br>
+        <label>Contract Effective Date:</label>
+        <input type="date" id="contract_effective_date" required><br>
+        <label>Quantity:</label>
+        <input type="number" id="quantity" required><br>
+        <label>Budget:</label>
+        <input type="number" id="budget" required><br>
+        <button type="button" onclick="submitEvent()">Submit</button>
+    </form>
+    <div id="recommendations"></div>
+</body>
+</html>
