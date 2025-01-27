@@ -4,88 +4,56 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Create Procurement Event</title>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            background-color: #f9f9f9;
-            margin: 0;
-            padding: 20px;
-        }
-
-        h1 {
-            color: #333;
-            text-align: center;
-        }
-
-        form {
-            background-color: #fff;
-            padding: 20px;
-            margin: 0 auto;
-            width: 50%;
-            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
-            border-radius: 8px;
-        }
-
-        label {
-            display: block;
-            margin-top: 10px;
-            font-weight: bold;
-        }
-
-        input, select, button {
-            width: 100%;
-            padding: 10px;
-            margin-top: 5px;
-            border: 1px solid #ccc;
-            border-radius: 4px;
-        }
-
-        button {
-            background-color: #007BFF;
-            color: white;
-            font-weight: bold;
-            border: none;
-            cursor: pointer;
-        }
-
-        button:hover {
-            background-color: #0056b3;
-        }
-
-        #recommendations {
-            margin-top: 20px;
-            background-color: #fff;
-            padding: 20px;
-            border-radius: 8px;
-            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
-        }
-
-        .supplier-recommendation {
-            border-bottom: 1px solid #ccc;
-            padding: 10px 0;
-        }
-
-        .supplier-recommendation:last-child {
-            border-bottom: none;
-        }
-
-        .edit-publish-btn {
-            display: inline-block;
-            background-color: #28a745;
-            color: white;
-            font-weight: bold;
-            padding: 10px 20px;
-            text-align: center;
-            text-decoration: none;
-            border-radius: 4px;
-            margin-top: 20px;
-        }
-
-        .edit-publish-btn:hover {
-            background-color: #218838;
-        }
-    </style>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100">
+    <div class="max-w-4xl mx-auto py-10">
+        <h1 class="text-2xl font-bold mb-4 text-center">Create Procurement Event</h1>
+        <form id="eventForm" class="bg-white p-6 shadow-md rounded">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                    <label for="base_language" class="block text-sm font-medium">Base Language</label>
+                    <input type="text" id="base_language" class="w-full p-2 border border-gray-300 rounded" required>
+                </div>
+                <div>
+                    <label for="regions" class="block text-sm font-medium">Regions</label>
+                    <input type="text" id="regions" class="w-full p-2 border border-gray-300 rounded" required>
+                </div>
+                <div>
+                    <label for="departments" class="block text-sm font-medium">Departments</label>
+                    <input type="text" id="departments" class="w-full p-2 border border-gray-300 rounded" required>
+                </div>
+                <div>
+                    <label for="currency" class="block text-sm font-medium">Currency</label>
+                    <input type="text" id="currency" class="w-full p-2 border border-gray-300 rounded" required>
+                </div>
+                <div>
+                    <label for="commodity" class="block text-sm font-medium">Commodity</label>
+                    <input type="text" id="commodity" class="w-full p-2 border border-gray-300 rounded" required>
+                </div>
+                <div>
+                    <label for="contract_months" class="block text-sm font-medium">Contract Months</label>
+                    <input type="number" id="contract_months" class="w-full p-2 border border-gray-300 rounded" required>
+                </div>
+                <div>
+                    <label for="contract_effective_date" class="block text-sm font-medium">Contract Effective Date</label>
+                    <input type="date" id="contract_effective_date" class="w-full p-2 border border-gray-300 rounded" required>
+                </div>
+                <div>
+                    <label for="quantity" class="block text-sm font-medium">Quantity</label>
+                    <input type="number" id="quantity" class="w-full p-2 border border-gray-300 rounded" required>
+                </div>
+                <div>
+                    <label for="budget" class="block text-sm font-medium">Budget</label>
+                    <input type="number" id="budget" class="w-full p-2 border border-gray-300 rounded" required>
+                </div>
+            </div>
+            <button type="button" onclick="submitEvent()" class="bg-blue-600 text-white px-4 py-2 rounded mt-6 w-full hover:bg-blue-700">
+                Submit
+            </button>
+        </form>
+        <div id="recommendations" class="mt-10"></div>
+    </div>
     <script>
         function submitEvent() {
             const buyerInput = {
@@ -112,100 +80,21 @@
 
         function displayRecommendations(data) {
             const container = document.getElementById("recommendations");
-            container.innerHTML = "<h2>Supplier Recommendations</h2>";
-            if (data.error) {
-                container.innerHTML += `<p>Error: ${data.error}</p>`;
-                return;
-            }
-
+            container.innerHTML = `
+                <h2 class="text-xl font-bold">Supplier Recommendations</h2>
+            `;
             const suppliers = data.ranked_suppliers;
-            const insights = data.ai_insights;
-
-            suppliers.forEach((supplier, index) => {
+            suppliers.forEach(supplier => {
                 container.innerHTML += `
-                    <div class="supplier-recommendation">
-                        <input type="checkbox" class="supplier-checkbox" value="${supplier.supplier_name}">
-                        <strong>${index + 1}. ${supplier.supplier_name}</strong> (Score: ${supplier.score})<br>
-                        Reason: ${supplier.ranking_reason}<br>
-                        Explanation: ${supplier.explanation}<br>
-                        Match: ${supplier.match_percentage}%<br>
-                        Region: ${supplier.region}<br>
-                        Risks: ${supplier.risks.join(", ")}<br>
-                        <strong>AI Insights:</strong>
-                        <ul>
-                            <li>Trends: ${supplier.ai_insights.trends.join(", ")}</li>
-                            <li>Optimizations: ${supplier.ai_insights.optimizations.join(", ")}</li>
-                        </ul>
+                    <div class="mt-4 p-4 bg-gray-50 border border-gray-200 rounded">
+                        <strong>${supplier.supplier_name}</strong> (Score: ${supplier.score})<br>
+                        Match Percentage: ${supplier.match_percentage}%<br>
+                        Ranking Reason: ${supplier.ranking_reason}<br>
+                        <strong>AI Insights:</strong> ${supplier.ai_insights.trends.join(", ")}
                     </div>
                 `;
             });
-
-            container.innerHTML += `
-                <h3>Global AI Insights</h3>
-                <p><strong>Trends:</strong> ${insights.trends.join(", ")}</p>
-                <p><strong>Risks:</strong> ${insights.risks.join(", ")}</p>
-                <p><strong>Optimizations:</strong> ${insights.optimizations.join(", ")}</p>
-                <button onclick="proceedToEdit()" class="edit-publish-btn">Edit and Publish</button>
-            `;
         }
-
-        function proceedToEdit() {
-			const selectedSuppliers = [];
-			document.querySelectorAll(".supplier-checkbox:checked").forEach(checkbox => {
-				selectedSuppliers.push(checkbox.value);
-			});
-
-			if (selectedSuppliers.length === 0) {
-				alert("Please select at least one supplier.");
-				return;
-			}
-
-			const data = {
-				selected_suppliers: selectedSuppliers,
-				quantity: document.getElementById("quantity").value,
-				commodity: document.getElementById("commodity").value,
-				budget: document.getElementById("budget").value,
-			};
-
-			fetch('/edit_event', {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify(data)
-			})
-			.then(response => response.json())
-			.then(data => {
-				if (data.message) {
-					window.location.href = "/edit_event"; // Redirect to edit event page
-				}
-			})
-			.catch(error => alert("Error proceeding to edit page: " + error));
-		}
-
     </script>
-</head>
-<body>
-    <h1>Create Procurement Event</h1>
-    <form>
-        <label>Base Language:</label>
-        <input type="text" id="base_language" required><br>
-        <label>Regions:</label>
-        <input type="text" id="regions" required><br>
-        <label>Departments:</label>
-        <input type="text" id="departments" required><br>
-        <label>Currency:</label>
-        <input type="text" id="currency" required><br>
-        <label>Commodity:</label>
-        <input type="text" id="commodity" required><br>
-        <label>Contract Months:</label>
-        <input type="number" id="contract_months" required><br>
-        <label>Contract Effective Date:</label>
-        <input type="date" id="contract_effective_date" required><br>
-        <label>Quantity:</label>
-        <input type="number" id="quantity" required><br>
-        <label>Budget:</label>
-        <input type="number" id="budget" required><br>
-        <button type="button" onclick="submitEvent()">Submit</button>
-    </form>
-    <div id="recommendations"></div>
 </body>
 </html>

@@ -1,5 +1,8 @@
 from flask import Flask, request, jsonify, render_template, session
 import pandas as pd
+import faiss
+from sentence_transformers import SentenceTransformer
+import json
 
 # Uncomment to enable OpenAI integration
 # import openai
@@ -12,72 +15,94 @@ app.secret_key = "supersecretkey"
 
 # Load historical supplier data
 try:
-    historical_supplier_data = pd.read_csv("data/historical_supplier_data.csv").to_dict(orient="records")
+    historical_supplier_data = pd.read_csv("data/historical_supplier_data.csv")
+    historical_supplier_data["embedding"] = historical_supplier_data["Commodity"].apply(lambda x: x.lower())
     print(f"Loaded {len(historical_supplier_data)} historical supplier records.")
 except Exception as e:
     print(f"Error loading supplier data: {e}")
-    historical_supplier_data = []
+    historical_supplier_data = pd.DataFrame()
+
+# FAISS index setup
+embedding_model = SentenceTransformer('all-MiniLM-L6-v2')  # Replace with your preferred embedding model
+commodity_embeddings = embedding_model.encode(historical_supplier_data["embedding"].tolist())
+faiss_index = faiss.IndexFlatL2(commodity_embeddings.shape[1])
+faiss_index.add(commodity_embeddings)
+
+
+def call_gpt_in_chunks(prompt_template, data, chunk_size=10):
+    """Handle large data by chunking and aggregating GPT responses."""
+    all_responses = []
+    for i in range(0, len(data), chunk_size):
+        chunk = data[i:i + chunk_size]
+        prompt = prompt_template.format(data=json.dumps(chunk, indent=2))
+        
+        # Uncomment for OpenAI Integration
+        # response = openai.ChatCompletion.create(
+        #     model="gpt-4",
+        #     messages=[{"role": "system", "content": "You are a procurement AI assistant."},
+        #               {"role": "user", "content": prompt}]
+        # )
+        # chunk_response = eval(response['choices'][0]['message']['content'])
+        
+        # Mocked response for testing
+        chunk_response = {
+            "ranked_suppliers": [
+                {
+                    "supplier_name": supplier["Supplier Name"],
+                    "score": 95,
+                    "match_percentage": 97,
+                    "ranking_reason": f"High performance for {supplier['Commodity']}.",
+                    "region": supplier["Region"],
+                    "risks": ["Occasional delays during peak seasons."]
+                }
+                for supplier in chunk
+            ]
+        }
+        all_responses.extend(chunk_response["ranked_suppliers"])
+    return all_responses
+
 
 @app.route('/')
 def index():
     return render_template('index.html')
 
+
+# @app.route('/get_suppliers', methods=['POST'])
+# def get_suppliers():
+    # buyer_input = request.json
+    # print(f"Buyer Input: {buyer_input}")
+
+    # commodity = buyer_input["commodity"].lower()
+    # query_embedding = embedding_model.encode([commodity])[0]
+
+    # _, indices = faiss_index.search(query_embedding.reshape(1, -1), k=50)
+    # relevant_suppliers = historical_supplier_data.iloc[indices[0]].to_dict(orient="records")
+
+    # # Chunked processing for large data
+    # prompt_template = """
+    # You are an AI procurement assistant. Based on the following supplier data, provide:
+    # 1. Ranked supplier recommendations with match percentage and reasons.
+    # 2. Risks associated with each supplier.
+
+    # Supplier Data:
+    # {data}
+
+    # Respond in JSON format:
+    # {{
+        # "ranked_suppliers": [...]
+    # }}
+    # """
+    # ranked_suppliers = call_gpt_in_chunks(prompt_template, relevant_suppliers)
+
+    # session["supplier_recommendations"] = {"ranked_suppliers": ranked_suppliers}
+    # return jsonify({"ranked_suppliers": ranked_suppliers})
+    
 @app.route('/get_suppliers', methods=['POST'])
 def get_suppliers():
     buyer_input = request.json
     print(f"Buyer Input: {buyer_input}")
 
-    # Uncomment the OpenAI integration code below for supplier recommendations
-
-    # """
-    # prompt = f"""
-    # You are an AI procurement assistant. Based on the following historical supplier data and buyer input, provide:
-    # 1. Ranked supplier recommendations with match percentage and reasons.
-    # 2. Risks associated with each supplier.
-    # 3. AI insights including trends and optimizations.
-
-    # Historical Supplier Data:
-    # {historical_supplier_data}
-
-    # Buyer Input:
-    # {buyer_input}
-
-    # Respond in JSON format:
-    # {{
-    #   "ranked_suppliers": [
-    #       {{
-    #           "supplier_name": "Supplier Name",
-    #           "score": 95,
-    #           "match_percentage": 97,
-    #           "ranking_reason": "Reason for ranking.",
-    #           "region": "Supplier region",
-    #           "risks": ["Risk 1", "Risk 2"],
-    #           "ai_insights": {{
-    #               "trends": ["Trend 1", "Trend 2"],
-    #               "optimizations": ["Optimization 1", "Optimization 2"]
-    #           }}
-    #       }},
-    #       ...
-    #   ],
-    #   "ai_insights": {{
-    #       "trends": [...],
-    #       "risks": [...],
-    #       "optimizations": [...]
-    #   }}
-    # }}
-    # """
-    # try:
-    #     response = openai.ChatCompletion.create(
-    #         model="gpt-4",
-    #         messages=[{"role": "system", "content": "You are a procurement AI assistant."},
-    #                   {"role": "user", "content": prompt}]
-    #     )
-    #     output = eval(response['choices'][0]['message']['content'])
-    # except Exception as e:
-    #     print(f"OpenAI GPT-4 Error: {e}")
-    #     return jsonify({"error": "Failed to get AI recommendations."}), 500
-
-    # Mocked GPT-4 output for now
+    # Mocked GPT-4 output
     output = {
         "ranked_suppliers": [
             {
@@ -99,10 +124,7 @@ def get_suppliers():
                 "ranking_reason": "Fast delivery and good pricing.",
                 "region": "Europe",
                 "risks": ["Slightly lower quality rating for certain items."],
-                "ai_insights": {
-                    "trends": ["European suppliers are offering discounts this quarter."],
-                    "optimizations": ["Combine orders with other commodities to save costs."]
-                }
+                "ai_insights": {}  # Default empty ai_insights
             }
         ],
         "ai_insights": {
@@ -118,8 +140,15 @@ def get_suppliers():
         }
     }
 
+    # Ensure every supplier has an 'ai_insights' field
+    for supplier in output["ranked_suppliers"]:
+        if "ai_insights" not in supplier:
+            supplier["ai_insights"] = {"trends": [], "optimizations": []}
+
     session["supplier_recommendations"] = output
     return jsonify(output)
+
+
 
 @app.route('/edit_event', methods=['GET', 'POST'])
 def edit_event():
@@ -131,7 +160,6 @@ def edit_event():
         session['budget'] = data.get('budget', '')
         return jsonify({"message": "Suppliers selected successfully!"})
 
-    # Pass the stored data to the template
     return render_template(
         'edit_event.html',
         selected_suppliers=session.get('selected_suppliers', []),
@@ -140,12 +168,12 @@ def edit_event():
         budget=session.get('budget', '')
     )
 
+
 @app.route('/publish_event', methods=['POST'])
 def publish_event():
     event_data = request.json
     print(f"Published Event Data: {event_data}")
 
-    # Store the published event data in the session
     session["published_event"] = {
         "selected_suppliers": session.get("selected_suppliers", []),
         "quantity": session.get("quantity", ""),
@@ -157,6 +185,7 @@ def publish_event():
 
     return jsonify({"message": "Event published successfully! Redirecting to analyze quotes."})
 
+
 @app.route('/analyze_quotes', methods=['GET'])
 def analyze_quotes():
     try:
@@ -166,79 +195,34 @@ def analyze_quotes():
 
         print(f"Event Data for Analysis: {event_data}")
 
-        # Uncomment the OpenAI integration code below for analyzing quotes
+        # Read supplier quotations from a file
+        with open('supplier_quotations.txt', 'r') as f:
+            supplier_quotations = json.loads(f.read())
 
-        # """
-        # prompt = f"""
-        # You are an AI procurement assistant. Based on the following supplier quotations and buyer requirements, provide:
-        # 1. Ranked supplier quotes based on price, delivery time, quality, and additional terms.
-        # 2. Explanations for the rankings, highlighting trade-offs.
-        # 3. AI insights including trends, risks, and optimizations.
+        # Chunked processing for large supplier quotes
+        prompt_template = """
+        You are an AI procurement assistant. Based on the following supplier quotations and buyer requirements, provide:
+        1. Ranked supplier quotes based on price, delivery time, and terms.
+        2. AI insights including trends, risks, and optimizations.
 
-        # Buyer Requirements:
-        # {event_data}
+        Buyer Requirements:
+        {buyer_requirements}
 
-        # Supplier Quotations:
-        # {supplier_quotations}
+        Supplier Quotations:
+        {data}
 
-        # Respond in JSON format:
-        # {{
-        #   "ranked_quotes": [
-        #       {{
-        #           "supplier_name": "Supplier Name",
-        #           "price_per_unit": 1200,
-        #           "total_cost": 120000,
-        #           "delivery_date": "2025-01-25",
-        #           "additional_terms": "Free shipping for orders above $10,000.",
-        #           "score": 96,
-        #           "explanation": "Ranked high due to competitive pricing, fast delivery, and excellent terms."
-        #       }},
-        #       ...
-        #   ],
-        #   "ai_insights": {{
-        #       "trends": [...],
-        #       "risks": [...],
-        #       "optimizations": [...],
-        #       "sustainability": [...]
-        #   }}
-        # }}
-        # """
-        # try:
-        #     response = openai.ChatCompletion.create(
-        #         model="gpt-4",
-        #         messages=[{"role": "system", "content": "You are a procurement AI assistant."},
-        #                   {"role": "user", "content": prompt}]
-        #     )
-        #     output = eval(response['choices'][0]['message']['content'])
-        # except Exception as e:
-        #     print(f"OpenAI GPT-4 Error: {e}")
-        #     return jsonify({"error": "Failed to get AI insights."}), 500
+        Respond in JSON format:
+        {{
+            "ranked_quotes": [...],
+            "ai_insights": {{...}}
+        }}
+        """
+        chunked_prompt = prompt_template.format(buyer_requirements=json.dumps(event_data, indent=2))
+        ranked_quotes = call_gpt_in_chunks(chunked_prompt, supplier_quotations)
 
-        # Mocked supplier quotes for testing
-        quotes = [
-            {
-                "supplier_name": "TechWorld",
-                "price_per_unit": 1200,
-                "total_cost": 120000,
-                "delivery_date": "2025-01-25",
-                "additional_terms": "Free shipping for orders above $10,000.",
-                "score": 96,
-                "explanation": "Ranked high due to competitive pricing, fast delivery, and excellent terms."
-            },
-            {
-                "supplier_name": "DataMax",
-                "price_per_unit": 1150,
-                "total_cost": 138000,
-                "delivery_date": "2025-01-24",
-                "additional_terms": "5% discount for orders above 150 units.",
-                "score": 92,
-                "explanation": "Strong ranking due to discounted pricing and early delivery."
-            }
-        ]
-
-        # Mocked AI insights
+        # Mocked response
         analysis = {
-            "ranked_quotes": quotes,
+            "ranked_quotes": ranked_quotes,
             "ai_insights": {
                 "trends": ["RAM prices are stable this quarter.", "High demand expected in Q2."],
                 "risks": ["Potential delivery delays due to global chip shortages."],
@@ -250,6 +234,7 @@ def analyze_quotes():
 
     except Exception as e:
         return jsonify({"error": f"An error occurred: {e}"}), 500
+
 
 if __name__ == "__main__":
     app.run(debug=True)
