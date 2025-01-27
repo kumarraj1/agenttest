@@ -110,47 +110,44 @@
             .catch(error => alert("Error fetching suppliers: " + error));
         }
 
-		function displayRecommendations(data) {
-			const container = document.getElementById("recommendations");
-			container.innerHTML = "<h2>Supplier Recommendations</h2>";
-			if (data.error) {
-				container.innerHTML += `<p>Error: ${data.error}</p>`;
-				return;
-			}
+        function displayRecommendations(data) {
+            const container = document.getElementById("recommendations");
+            container.innerHTML = "<h2>Supplier Recommendations</h2>";
+            if (data.error) {
+                container.innerHTML += `<p>Error: ${data.error}</p>`;
+                return;
+            }
 
-			const suppliers = data.ranked_suppliers || [];
-			const insights = data.ai_insights || {};
+            const suppliers = data.ranked_suppliers;
+            const insights = data.ai_insights;
 
-			suppliers.forEach((supplier, index) => {
-				const trends = (supplier.ai_insights && supplier.ai_insights.trends) || [];
-				const optimizations = (supplier.ai_insights && supplier.ai_insights.optimizations) || [];
+            suppliers.forEach((supplier, index) => {
+                container.innerHTML += `
+                    <div class="supplier-recommendation">
+                        <input type="checkbox" class="supplier-checkbox" value="${supplier.supplier_name}">
+                        <strong>${index + 1}. ${supplier.supplier_name}</strong> (Score: ${supplier.score})<br>
+                        Reason: ${supplier.ranking_reason}<br>
+                        Explanation: ${supplier.explanation}<br>
+                        Match: ${supplier.match_percentage}%<br>
+                        Region: ${supplier.region}<br>
+                        Risks: ${supplier.risks.join(", ")}<br>
+                        <strong>AI Insights:</strong>
+                        <ul>
+                            <li>Trends: ${supplier.ai_insights.trends.join(", ")}</li>
+                            <li>Optimizations: ${supplier.ai_insights.optimizations.join(", ")}</li>
+                        </ul>
+                    </div>
+                `;
+            });
 
-				container.innerHTML += `
-					<div>
-						<input type="checkbox" class="supplier-checkbox" value="${supplier.supplier_name}">
-						<strong>${index + 1}. ${supplier.supplier_name}</strong> (Score: ${supplier.score})<br>
-						Reason: ${supplier.ranking_reason}<br>
-						Match: ${supplier.match_percentage}%<br>
-						Region: ${supplier.region}<br>
-						Risks: ${supplier.risks.join(", ")}<br>
-						<strong>AI Insights:</strong>
-						<ul>
-							<li>Trends: ${trends.join(", ") || "No trends available"}</li>
-							<li>Optimizations: ${optimizations.join(", ") || "No optimizations available"}</li>
-						</ul>
-					</div>
-				`;
-			});
-
-			container.innerHTML += `
-				<h3>Global AI Insights</h3>
-				<p><strong>Trends:</strong> ${insights.trends?.join(", ") || "No trends available"}</p>
-				<p><strong>Risks:</strong> ${insights.risks?.join(", ") || "No risks available"}</p>
-				<p><strong>Optimizations:</strong> ${insights.optimizations?.join(", ") || "No optimizations available"}</p>
-				<button onclick="proceedToEdit()">Edit and Publish</button>
-			`;
-		}
-
+            container.innerHTML += `
+                <h3>Global AI Insights</h3>
+                <p><strong>Trends:</strong> ${insights.trends.join(", ")}</p>
+                <p><strong>Risks:</strong> ${insights.risks.join(", ")}</p>
+                <p><strong>Optimizations:</strong> ${insights.optimizations.join(", ")}</p>
+                <button onclick="proceedToEdit()" class="edit-publish-btn">Edit and Publish</button>
+            `;
+        }
 
         function proceedToEdit() {
 			const selectedSuppliers = [];
